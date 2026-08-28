@@ -21,7 +21,7 @@ export declare function listPermissions(meta: GenuiMeta, versionId: string): Pro
 export declare function revokePermission(meta: GenuiMeta, capabilityId: string): Promise<{
     revoked: boolean;
 }>;
-export declare function previewUrlForLocale(meta: GenuiMeta, locale: 'en' | 'zh'): string;
+export declare function previewUrlForLocale(meta: GenuiMeta, locale: 'en' | 'sv' | 'zh'): string;
 export declare function readDesignSettings(): Promise<DesignSettings>;
 export declare function setDefaultDesign(designId: string | null): Promise<DesignSettings>;
 export declare function importDesign(designId: string, content: string): Promise<DesignSettings>;

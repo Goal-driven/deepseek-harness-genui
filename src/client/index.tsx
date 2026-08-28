@@ -4,17 +4,19 @@ import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type { PropsLocale, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { grantAllPermissions, grantPermission, listPermissions, previewUrlForLocale, revokePermission } from './api.ts'
 import { canvasController, useCanvasArtifact, useCanvasSurface } from './canvas.ts'
 import { DesignSettingsCard } from './design-settings.tsx'
 import { ShellIcon } from './icons.tsx'
 import { artifactCardLedger, usePrimaryArtifactCard } from './ledger.ts'
-import { en, NS, zh } from './locales.ts'
+import { en, NS, sv, zh } from './locales.ts'
 import { enqueuePermission, settlePermission } from './permission-queue.ts'
 import { isGenuiReadyMessage, isGenuiRuntimeErrorMessage } from './readiness.ts'
 import { settingsSlotRegistration } from './settings-slot.ts'
 import { cardCss } from './styles.ts'
 import { readMeta } from './types.ts'
+import { WorkOsLauncher } from './work-os.tsx'
 import type { GenuiMeta, PermissionRequest, PermissionStatus } from './types.ts'
 
 interface GenuiToolViewProps extends ToolCallViewProps, PropsLocale<'genui'> {}
@@ -110,7 +112,7 @@ export function GenuiToolView({ block, callId, sessionId, t }: GenuiToolViewProp
   const permissionDescriptionId = `${titleId}-permission-description`
   const accessTitleId = `${titleId}-access`
   const accessDescriptionId = `${titleId}-access-description`
-  const locale = t('locale.code') as 'en' | 'zh'
+  const locale = t('locale.code') as 'en' | 'sv' | 'zh'
   const canvasSessionId = String(sessionId)
   const artifactKey = meta?.artifactId ?? `pending:${callId}`
   const displayTitle = meta?.title || t('app.untitled')
@@ -605,8 +607,18 @@ export function GenuiToolView({ block, callId, sessionId, t }: GenuiToolViewProp
 
 export const inject = ['slots', 'locale']
 
+function browserPrefersSwedish(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const languages = navigator.languages?.length ? navigator.languages : [navigator.language]
+  return languages[0]?.toLowerCase().split('-')[0] === 'sv'
+}
+
 export function apply(ctx: ClientContext): void {
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'genui: dictionaries')
+  // The Harness locale service currently exposes zh/en as its only selectable
+  // shell locales. GenUI still provides complete sv-SE by binding its own
+  // namespace to Swedish when the browser prefers Swedish.
+  const dictionaries = browserPrefersSwedish() ? { zh: sv, en: sv } : { zh, en }
+  ctx.effect(() => ctx.locale.register(NS, dictionaries), 'genui: dictionaries')
   const BoundGenuiToolView = (props: ToolCallViewProps & PropsLocale<'genui'>) => <GenuiToolView {...props} />
   const HiddenGenuiToolView = () => <span hidden />
   ctx.slots.inject('tool.call.toolview', function* () {
@@ -620,4 +632,11 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('settings.plugin.item', () => ctx.slots.register({
     ...settingsSlotRegistration(),
   }, DesignSettingsCard))
+  ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
+    name: 'conversation.input.right',
+    id: 'valuehub-work-os',
+    order: 20,
+    locale: NS,
+    inject: () => ({}),
+  }, WorkOsLauncher))
 }

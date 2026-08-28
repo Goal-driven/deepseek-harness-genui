@@ -13,6 +13,8 @@ import {
   capabilityById, capabilityFingerprint, externalCapability, isGranted, permissionView, toolCapability,
 } from './permissions.ts'
 import { ARTIFACT_RUNTIME_VERSION, STANDALONE_RUNTIME, standaloneHtml } from './standalone.ts'
+import { WorkOsConflictError } from '../work-os/store.ts'
+import type { Objective, WorkOsLocale, WorkOsStore, WorkTask } from '../work-os/store.ts'
 
 const CSP = [
   "default-src 'none'",
@@ -78,7 +80,7 @@ async function designSettings(designs: DesignStore): Promise<Record<string, unkn
   }
 }
 
-function html(routePrefix: string, artifactId: string, versionId: string, hasCss: boolean, language: 'en' | 'zh'): string {
+function html(routePrefix: string, artifactId: string, versionId: string, hasCss: boolean, language: 'en' | 'sv' | 'zh'): string {
   const css = hasCss ? `<link rel="stylesheet" href="${routePrefix}/assets/${artifactId}/${versionId}/app.css?runtime=${ARTIFACT_RUNTIME_VERSION}">` : ''
   return `<!doctype html>
 <html lang="${language}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="theme-color" content="#faf9f6" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#171717" media="(prefers-color-scheme: dark)">${css}</head>
@@ -95,6 +97,7 @@ export function createHttpRuntime(
   designs: DesignStore,
   capabilities: CapabilityStore,
   routePrefix: string,
+  workOs?: WorkOsStore,
 ): GenuiHttpRuntime {
   return {
     async handler(req, res) {
@@ -119,7 +122,7 @@ export function createHttpRuntime(
         if (req.method === 'GET' && relative[0] === 'app' && relative.length === 2) {
           const artifactId = relative[1] ?? ''
           const language = url.searchParams.get('lang')
-          if (language !== 'en' && language !== 'zh') return json(res, 400, { error: 'app language must be en or zh' })
+          if (language !== 'en' && language !== 'sv' && language !== 'zh') return json(res, 400, { error: 'app language must be en, sv, or zh' })
           const artifact = await registry.get(artifactId)
           if (artifact.currentVersionId === undefined) return json(res, 409, { error: 'app has no ready version' })
           const version = await registry.getVersion(artifactId, artifact.currentVersionId)
@@ -135,6 +138,25 @@ export function createHttpRuntime(
         }
         if (relative[0] === 'manage') {
           if (!acceptsManagementRequest(req)) return json(res, 403, { error: 'cross-site management requests are not allowed' })
+          if (relative.length === 2 && relative[1] === 'work-os') {
+            if (workOs === undefined) return json(res, 503, { error: 'work OS storage is unavailable' })
+            if (req.method === 'GET') {
+              json(res, 200, await workOs.read())
+              return
+            }
+            if (req.method === 'PUT') {
+              const input = await body(req, 1024 * 1024)
+              const saved = await workOs.replace({
+                expectedRevision: input.expectedRevision as number,
+                locale: input.locale as WorkOsLocale,
+                objectives: input.objectives as Objective[],
+                tasks: input.tasks as WorkTask[],
+              })
+              json(res, 200, saved)
+              return
+            }
+            return json(res, 405, { error: 'method not allowed' })
+          }
           if (req.method === 'GET' && relative.length === 2 && relative[1] === 'designs') {
             json(res, 200, await designSettings(designs))
             return
@@ -174,7 +196,7 @@ export function createHttpRuntime(
         if (req.method === 'GET' && relative[0] === 'preview' && relative.length === 3) {
           const [, artifactId = '', versionId = ''] = relative
           const language = url.searchParams.get('lang')
-          if (language !== 'en' && language !== 'zh') return json(res, 400, { error: 'preview language must be en or zh' })
+          if (language !== 'en' && language !== 'sv' && language !== 'zh') return json(res, 400, { error: 'preview language must be en, sv, or zh' })
           const version = await registry.getVersion(artifactId, versionId)
           if (version.status === 'failed') return json(res, 409, { error: 'artifact version failed validation' })
           const cssPath = safeJoin(registry.distPath(artifactId, versionId), 'app.css')
@@ -342,6 +364,9 @@ export function createHttpRuntime(
         }
         json(res, 404, { error: 'not found' })
       } catch (error) {
+        if (error instanceof WorkOsConflictError) {
+          return json(res, 409, { error: 'state_changed', current_revision: error.currentRevision }, req)
+        }
         const code = (error as NodeJS.ErrnoException).code
         if (code === 'ENOENT') return json(res, 404, { error: 'artifact resource not found' })
         json(res, 400, { error: error instanceof Error ? error.message : String(error) }, req)
