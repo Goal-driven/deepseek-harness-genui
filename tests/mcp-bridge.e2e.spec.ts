@@ -15,6 +15,7 @@ import { DesignStore } from '../src/designs/store.ts'
 import { CapabilityStore } from '../src/runtime/capabilities.ts'
 import { createHttpRuntime } from '../src/runtime/server.ts'
 import { ARTIFACT_RUNTIME_VERSION } from '../src/runtime/standalone.ts'
+import { WorkOsStore } from '../src/work-os/store.ts'
 
 describe('real MCP artifact bridge', () => {
   let ctx: Context
@@ -63,13 +64,15 @@ describe('real MCP artifact bridge', () => {
       checkedAt: new Date().toISOString(), build: 'passed', browser: 'not-run', diagnostics: [], notes: [],
     })
     const capabilities = new CapabilityStore()
+    const workOs = new WorkOsStore(join(root, '.work-os'))
+    await workOs.init()
     const fakeAgent = {
       id: SessionId('genui-mcp-e2e'),
       ctx,
     } as unknown as Agent
     token = capabilities.issue('mcp-artifact', fakeAgent)
     verificationToken = capabilities.issue('mcp-artifact', fakeAgent, 'verification')
-    const runtime = createHttpRuntime(ctx, registry, designs, capabilities, '/genui')
+    const runtime = createHttpRuntime(ctx, registry, designs, capabilities, '/genui', workOs)
     const server = createServer((req, res) => {
       runtime.handler(req, res).catch((error: unknown) => {
         res.writeHead(500)
@@ -197,6 +200,10 @@ describe('real MCP artifact bridge', () => {
     expect(zhDocument).toContain('<meta name="theme-color" content="#faf9f6" media="(prefers-color-scheme: light)">')
     expect(zhDocument).toContain('<meta name="theme-color" content="#171717" media="(prefers-color-scheme: dark)">')
 
+    const svResponse = await fetch(`${origin}/genui/preview/mcp-artifact/${versionId}?lang=sv#token=${token}`)
+    expect(svResponse.status).toBe(200)
+    expect(await svResponse.text()).toContain('<html lang="sv">')
+
     const missingLanguage = await fetch(`${origin}/genui/preview/mcp-artifact/${versionId}#token=${token}`)
     expect(missingLanguage.status).toBe(400)
   })
@@ -241,6 +248,41 @@ describe('real MCP artifact bridge', () => {
 
     const crossSite = await fetch(`${origin}/genui/manage/designs`, { headers: { 'sec-fetch-site': 'cross-site' } })
     expect(crossSite.status).toBe(403)
+  })
+
+  it('persists shared OKR and Kanban data with optimistic concurrency', async () => {
+    const endpoint = `${origin}/genui/manage/work-os`
+    const initial = await fetch(endpoint)
+    expect(initial.status).toBe(200)
+    expect(await initial.json()).toMatchObject({ revision: 0, locale: 'sv-SE', objectives: [], tasks: [] })
+
+    const payload = {
+      expectedRevision: 0,
+      locale: 'sv-SE',
+      objectives: [{
+        id: 'objective-quality', title: 'Bäst kundupplevelse', owner: 'Produkt', period: 'Q4', status: 'on-track',
+        keyResults: [{ id: 'kr-nps', title: 'NPS', current: 48, target: 60, unit: 'poäng' }],
+      }],
+      tasks: [{
+        id: 'task-interviews', title: 'Intervjua fem kunder', column: 'doing', objectiveId: 'objective-quality',
+        keyResultId: 'kr-nps', assignee: 'Sara', priority: 'high', order: 0,
+      }],
+    }
+    const saved = await fetch(endpoint, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    expect(saved.status).toBe(200)
+    expect(await saved.json()).toMatchObject({ revision: 1, tasks: [expect.objectContaining({ id: 'task-interviews' })] })
+
+    const stale = await fetch(endpoint, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    expect(stale.status).toBe(409)
+    expect(await stale.json()).toEqual({ error: 'state_changed', current_revision: 1 })
   })
 
   it('dry-runs state writes and returns inert tool data during browser verification', async () => {

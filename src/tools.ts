@@ -112,7 +112,7 @@ async function compile(
   version: ArtifactVersion,
   agent: Agent,
   delivery: ToolReceipt['delivery'],
-  language: 'en' | 'zh',
+  language: 'en' | 'sv' | 'zh',
 ): Promise<ToolReceipt> {
   const artifact = await registry.get(version.artifactId)
   const result = await buildArtifact(version, registry.distPath(version.artifactId, version.id))
@@ -145,7 +145,7 @@ async function compile(
     notes: ['candidate accepted after compile and source contract checks'],
   })
   const token = capabilities.issue(version.artifactId, agent)
-  const previewUrl = `${routePrefix}/preview/${version.artifactId}/${version.id}?lang=en#token=${token}`
+  const previewUrl = `${routePrefix}/preview/${version.artifactId}/${version.id}?lang=${language}#token=${token}`
   const appUrl = `${previewOrigin}${routePrefix}/app/${version.artifactId}?lang=${language}#token=${token}`
   return {
     artifact_id: settled.artifactId,
@@ -205,7 +205,7 @@ const deliverySpec = {
 const languageSpec = {
   type: 'string' as const,
   required: true,
-  enum: ['en', 'zh'] as const,
+  enum: ['en', 'sv', 'zh'] as const,
   description: 'The user-facing language of the generated app.',
 } as const
 

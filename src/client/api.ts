@@ -88,7 +88,7 @@ export function revokePermission(meta: GenuiMeta, capabilityId: string): Promise
   return post(meta, 'permission/revoke', { capability_id: capabilityId })
 }
 
-export function previewUrlForLocale(meta: GenuiMeta, locale: 'en' | 'zh'): string {
+export function previewUrlForLocale(meta: GenuiMeta, locale: 'en' | 'sv' | 'zh'): string {
   const { preview } = access(meta)
   preview.searchParams.set('lang', locale)
   return preview.toString()

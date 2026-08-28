@@ -3,8 +3,9 @@ import type { Context } from '@deepseek-ai/cordis';
 import type { ArtifactRegistry } from '../artifacts/registry.ts';
 import type { DesignStore } from '../designs/store.ts';
 import type { CapabilityStore } from './capabilities.ts';
+import type { WorkOsStore } from '../work-os/store.ts';
 export interface GenuiHttpRuntime {
     handler(req: IncomingMessage, res: ServerResponse): Promise<void>;
 }
-export declare function createHttpRuntime(ctx: Context, registry: ArtifactRegistry, designs: DesignStore, capabilities: CapabilityStore, routePrefix: string): GenuiHttpRuntime;
+export declare function createHttpRuntime(ctx: Context, registry: ArtifactRegistry, designs: DesignStore, capabilities: CapabilityStore, routePrefix: string, workOs?: WorkOsStore): GenuiHttpRuntime;
 //# sourceMappingURL=server.d.ts.map

@@ -6,6 +6,8 @@ export type { ResolvedConfig } from './config.ts'
 export { apply } from './runtime.ts'
 export { ArtifactRegistry } from './artifacts/registry.ts'
 export { DesignStore } from './designs/store.ts'
+export { WorkOsConflictError, WorkOsStore } from './work-os/store.ts'
+export type { KeyResult, Objective, WorkOsState, WorkTask } from './work-os/store.ts'
 export { DESIGN_PRESETS } from './designs/presets.ts'
 export { buildArtifact } from './artifacts/builder.ts'
 export type {

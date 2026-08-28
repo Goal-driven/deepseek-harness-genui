@@ -45,6 +45,18 @@ The same app can sit inside the answer or open beside the conversation.
 
 Inline, Canvas, fullscreen, and CLI/localhost are different surfaces over the same task state. Selections and inputs saved in one surface remain available to later Agent turns.
 
+## ValueHub Work OS
+
+The ValueHub distribution adds a persistent Work OS Canvas beside the conversation:
+
+- OKRs with owners, periods, status, measurable key results, and computed progress.
+- A four-stage Kanban board with drag-and-drop on desktop and an accessible status selector on mobile.
+- Shared objective links between OKRs and cards, so planning and delivery use one atomic data model.
+- Optimistic revision checks that prevent one browser from silently overwriting another browser's edits.
+- Complete Swedish (`sv-SE`) copy for GenUI previews and the Work OS Canvas; Swedish browsers select it automatically.
+
+The state is stored under the GenUI registry root in `.work-os/state.json`. In the ValueHub deployment that root lives on the mounted Hetzner volume, so redeployments preserve the workspace. The management endpoint is same-origin only and accepts a bounded, fully validated document.
+
 ## CLI Example
 
 The terminal profile returns a localhost app. A follow-up can refer to the path already selected in that app.
@@ -146,6 +158,8 @@ The useful proof is not only that an interface appears—it is that the next Age
 ## Safety
 
 Generated code runs in a sandbox. Direct API requests are limited to declared, credential-free public HTTPS routes. Temporary links and grants expire after 7 days; saved task state expires 7 days after its last update. Return to the app card in the task to review or remove access.
+
+Work OS does not execute card or OKR text as prompts, code, markup, or commands. It stores plain bounded strings and validates identifiers, duplicate records, numeric key-result ranges, and task-to-objective references before replacing the state atomically.
 
 The plugin uses DeepSeek Harness + Cordis, React 18 + TypeScript, and esbuild. Repository tests use Playwright and Vitest.
 

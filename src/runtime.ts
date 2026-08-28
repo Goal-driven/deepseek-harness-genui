@@ -15,6 +15,7 @@ import { registerDesignSettingsNamespace } from './runtime/settings-namespace.ts
 import { createHttpRuntime } from './runtime/server.ts'
 import { registerGenuiTools } from './tools.ts'
 import { GENUI_BEHAVIOR_PROMPT, genuiSystemPrompt } from './prompt.ts'
+import { WorkOsStore } from './work-os/store.ts'
 
 export async function apply(ctx: Context, config: Config): Promise<() => void> {
   const resolved = resolveConfig(config)
@@ -23,11 +24,13 @@ export async function apply(ctx: Context, config: Config): Promise<() => void> {
   await registry.init()
   const designs = new DesignStore(resolve(registry.root, '.designs'))
   await designs.init()
+  const workOs = new WorkOsStore(resolve(registry.root, '.work-os'))
+  await workOs.init()
   const capabilities = await CapabilityStore.persistent(
     resolve(registry.root, '.capability-key'),
     sessionId => ctx.agents.get(SessionId(sessionId)),
   )
-  const http = createHttpRuntime(ctx, registry, designs, capabilities, resolved.routePrefix)
+  const http = createHttpRuntime(ctx, registry, designs, capabilities, resolved.routePrefix, workOs)
   ctx.webServer.register({ kind: 'prefix', path: resolved.routePrefix, handler: http.handler })
   ctx.webServer.register({ kind: 'exact', path: '/.well-known/dsh-genui', handler: http.handler })
   ctx.systemPrompt.section({ name: 'behavior:genui', order: 1, text: GENUI_BEHAVIOR_PROMPT })
@@ -36,6 +39,7 @@ export async function apply(ctx: Context, config: Config): Promise<() => void> {
   const previewOrigin = `http://127.0.0.1:${ctx.webServer.port}`
   registerGenuiTools(ctx, registry, designs, capabilities, resolved.routePrefix, previewOrigin)
   ctx.logger.info(`GenUI artifacts: ${registry.root}`)
+  ctx.logger.info(`GenUI Work OS: ${workOs.root}`)
 
   return () => {
     capabilities.clear()
